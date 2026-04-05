@@ -212,19 +212,43 @@ def process_token(uid, password):
         return {"status_code":response.status_code,"uid": uid, "error": f"An error occurred while making the request: {e}"}
 
 
-def process_token_direct(access_token):
+def get_open_id_from_access_token(access_token):
     """
-    Accepts only access_token, extracts open_id from token payload automatically,
-    then generates FF JWT via MajorLogin.
+    Calls Garena API to get open_id from access_token
+    """
+    try:
+        url = "https://100067.connect.garena.com/oauth/token/info"
+        headers = {
+            "Accept-Encoding": "gzip",
+            "Connection": "Keep-Alive",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Host": "100067.connect.garena.com",
+            "User-Agent": "GarenaMSDK/4.0.19P8(ASUS_Z01QD ;Android 12;en;US;)",
+        }
+        data = {
+            "access_token": access_token,
+            "client_id": "100067",
+            "client_secret": "2ee44819e9b4598845141067b281621874d0d5d7af9d8f7e00c1e54715b7d1e3",
+        }
+        response = requests.post(url, headers=headers, data=data, verify=False, timeout=10)
+        if response.status_code == 200:
+            result = response.json()
+            return result.get("open_id", None)
+        return None
+    except Exception:
+        return None
+
+
+def process_token_direct(access_token, open_id=""):
+    """
+    Accepts access_token, auto-fetches open_id from Garena API, generates FF JWT via MajorLogin.
     """
     from datetime import datetime, timezone
 
-    # Extract open_id from token payload automatically
-    from app.utils.decode_token import decode_token_payload
-    payload = decode_token_payload(access_token)
-    open_id = str(payload.get("external_uid", ""))
-    if not open_id or open_id == "":
-        return {"error": True, "message": "Could not extract open_id from access_token", "status_code": 400}
+    if not open_id:
+        open_id = get_open_id_from_access_token(access_token)
+    if not open_id:
+        return {"error": True, "message": "Could not fetch open_id from access_token", "status_code": 400}
 
 
     def current_timestamp(fmt="iso", tz=timezone.utc):
