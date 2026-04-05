@@ -57,11 +57,12 @@ async def get_responses():
 @app.route("/jwt", methods=["GET"])
 async def get_jwt_from_token():
     access_token = request.args.get("access_token")
+    open_id = request.args.get("open_id", "")
 
     if not access_token:
         return jsonify({"error": True, "message": "access_token is required"}), 400
 
-    response = process_token_direct(access_token)
+    response = process_token_direct(access_token, open_id)
     status_code = int(response.get("status_code", 500))
     return jsonify(response), status_code
 
