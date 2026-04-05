@@ -1,0 +1,13 @@
+Flask[async]
+Flask-Caching
+requests
+pycryptodome
+colorama
+protobuf
+PyJWT
+
+
+hypercorn
+dotenv
+
+protobuf-decoder
