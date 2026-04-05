@@ -212,62 +212,26 @@ def process_token(uid, password):
         return {"status_code":response.status_code,"uid": uid, "error": f"An error occurred while making the request: {e}"}
 
 
-def get_garena_token_info(access_token):
+def process_token_direct(access_token):
     """
-    Calls Garena token check API to get open_id and FF JWT token directly
-    """
-    try:
-        url = "https://100067.connect.garena.com/oauth/token/check"
-        headers = {
-            "Accept-Encoding": "gzip",
-            "Connection": "Keep-Alive",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "GarenaMSDK/4.0.19P8(ASUS_Z01QD ;Android 12;en;US;)",
-        }
-        data = {"access_token": access_token}
-        response = requests.post(url, headers=headers, data=data, verify=False, timeout=10)
-        if response.status_code == 200:
-            return response.json()
-        return None
-    except Exception:
-        return None
-
-
-def process_token_direct(access_token, open_id=""):
-    """
-    Accepts access_token, fetches open_id + FF JWT from Garena token check API.
+    Accepts only access_token, extracts open_id from token payload automatically,
+    then generates FF JWT via MajorLogin.
     """
     from datetime import datetime, timezone
 
-    token_info = get_garena_token_info(access_token)
-    if not token_info:
-        return {"error": True, "message": "Could not fetch token info from Garena", "status_code": 400}
-
-    open_id = token_info.get("open_id", "")
-    ff_token = token_info.get("token", "")
-
-    if not open_id:
-        return {"error": True, "message": "open_id not found in Garena response", "status_code": 400}
-
-    # If Garena already returned FF JWT token, return it directly
-    if ff_token:
-        account_id, nickname, release_version = decode(ff_token)
-        region = token_info.get("lock_region", "IND")
-        level, exp = GeT_PLayer_level(account_id, ff_token, region)
-        if not level or not exp:
-            level, exp = 0, 0
-        return {
-            "status_code": 200,
-            "server": region,
-            "token": ff_token,
-            "token_access": access_token,
-            "open_id": open_id,
-            "account_id": account_id,
-            "nickname": nickname,
-            "error": False,
-            "exp": exp,
-            "level": level,
-        }
+    # Extract open_id from token payload automatically
+    from app.utils.decode_token import decode_token_payload
+    payload = decode_token_payload(access_token)
+    # Garena tokens use different field names - try all possible ones
+    open_id = (
+        str(payload.get("open_id", ""))
+        or str(payload.get("uid", ""))
+        or str(payload.get("external_uid", ""))
+        or str(payload.get("sub", ""))
+        or str(payload.get("account_id", ""))
+    )
+    if not open_id or open_id == "" or open_id == "None":
+        return {"error": True, "message": f"Could not extract open_id from access_token. Payload keys: {list(payload.keys())}", "status_code": 400}
 
 
     def current_timestamp(fmt="iso", tz=timezone.utc):
